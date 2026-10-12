@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from .workflow import Workflow, WorkflowState
+from .history import WorkflowState
+from .workflow import Workflow
 
 
 class RecoveryDecision(str, Enum):
     RESUME = "resume"
     RECONCILE = "reconcile"
+    REVIEW = "review"
     COMPLETE = "complete"
 
 
@@ -18,19 +20,29 @@ class RecoveryPlan:
 
 
 def plan_recovery(workflow: Workflow, action_order: list[str]) -> RecoveryPlan:
-    if workflow.state() == WorkflowState.COMPLETED:
+    history = workflow.history()
+    state = history.state()
+
+    if state == WorkflowState.COMPLETED:
         return RecoveryPlan(RecoveryDecision.COMPLETE, (), "workflow already completed")
 
-    if workflow.unknown_actions():
+    if state == WorkflowState.BLOCKED:
+        conflicted = tuple(sorted(history.conflicted_actions()))
+        latest = history.latest()
+        detail = "; ".join(f"{a}: {latest[a].detail}" for a in conflicted)
+        return RecoveryPlan(RecoveryDecision.REVIEW, conflicted, detail)
+
+    unknown = tuple(sorted(history.unknown_actions()))
+    if unknown:
         return RecoveryPlan(
             RecoveryDecision.RECONCILE,
-            tuple(sorted(workflow.unknown_actions())),
+            unknown,
             "the latest attempt has no trustworthy terminal outcome",
         )
 
-    next_actions = tuple(a for a in action_order if a not in workflow.succeeded_actions())
+    succeeded = history.succeeded_actions()
     return RecoveryPlan(
         RecoveryDecision.RESUME,
-        next_actions,
+        tuple(a for a in action_order if a not in succeeded),
         "durable history shows which latest attempts already succeeded",
     )

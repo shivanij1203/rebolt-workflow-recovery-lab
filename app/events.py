@@ -9,6 +9,7 @@ class EventType(str, Enum):
     ACTION_SUCCEEDED = "action_succeeded"
     ACTION_FAILED = "action_failed"
     ACTION_UNKNOWN = "action_unknown"
+    ACTION_CONFLICT = "action_conflict"
     WORKFLOW_COMPLETED = "workflow_completed"
 
 
@@ -16,8 +17,13 @@ class EventType(str, Enum):
 class Event:
     sequence: int
     workflow_id: str
+    version: int
     action_id: str
     action: str
     event_type: EventType
-    attempt: int = 1
+    attempt: int
+    worker_id: str
+    lease_token: int
+    operation_id: Optional[str] = None
+    payload_fingerprint: Optional[str] = None
     detail: Optional[str] = None
